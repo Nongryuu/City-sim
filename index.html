@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>City Sim — Top-Down Grid (Traffic → PM2.5)</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="./style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="bgGlow" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">CITY</div>
+      <div class="brandText">
+        <h1>City-Scale Simulation</h1>
+        <p>Top-down Grid • Traffic → PM2.5 • Interactive Simulation</p>
+      </div>
+    </div>
+
+    <div class="topActions">
+      <button id="btnStart" class="btn btnPrimary">Start</button>
+      <button id="btnPause" class="btn">Pause</button>
+      <button id="btnReset" class="btn btnDanger">Reset</button>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="grid">
+
+      <!-- LEFT: City canvas -->
+      <section class="panel">
+        <div class="panelHead">
+          <div>
+            <h2>City View (Top-Down Grid)</h2>
+            <p class="muted">
+              มุมสูงแบบกระดานหมากรุก: อ่านง่าย ชัดเจน • สีแดงเข้ม = PM2.5 สูง
+            </p>
+          </div>
+
+          <div class="badges">
+            <span class="badge">Top-Down</span>
+            <span class="badge">Heatmap</span>
+            <span class="badge">Agents</span>
+          </div>
+        </div>
+
+        <div class="canvasShell">
+          <canvas id="cityCanvas" width="980" height="640"></canvas>
+
+          <div id="hoverTip" class="hoverTip" style="display:none;">
+            <div class="tTitle" id="tTitle">Cell</div>
+            <div class="tRow"><span>PM2.5</span><b id="tPm">0</b></div>
+            <div class="tRow"><span>Road</span><b id="tRoad">No</b></div>
+          </div>
+        </div>
+
+        <div class="kpis">
+          <div class="kpi"><div class="kLabel">Avg PM2.5</div><div class="kValue" id="avgPm">0</div></div>
+          <div class="kpi"><div class="kLabel">Peak PM2.5</div><div class="kValue" id="peakPm">0</div></div>
+          <div class="kpi"><div class="kLabel">Cars</div><div class="kValue" id="carsNow">0</div></div>
+          <div class="kpi"><div class="kLabel">Tick</div><div class="kValue" id="tickNow">0</div></div>
+        </div>
+
+        <div class="tips">
+          <div class="tipCard">
+            <div class="tipTitle">How to Watch</div>
+            <div class="tipBody">
+              1) เพิ่ม Cars → แดงไวขึ้น<br/>
+              2) ปรับ Wind → หมอกย้ายโซน<br/>
+              3) คลิกถนน → incident spike (PM พุ่ง)
+            </div>
+          </div>
+          <div class="tipCard">
+            <div class="tipTitle">Legend</div>
+            <div class="tipBody">
+              <b>ถนน</b> = โทนม่วงเข้ม • <b>พื้นที่</b> = โทนเขียวเข้ม<br/>
+              <b>PM2.5</b> = overlay แดง/ส้มเข้มตามระดับ
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT: Controls -->
+      <aside class="panel">
+        <div class="panelHead">
+          <div>
+            <h2>Parameters</h2>
+            <p class="muted">ปรับแล้วเห็นผลทันที (cause → effect)</p>
+          </div>
+        </div>
+
+        <div class="controls">
+          <div class="control">
+            <div class="controlTop"><label for="cars">Cars</label><span class="pill" id="carsVal">90</span></div>
+            <input id="cars" type="range" min="5" max="260" value="90" />
+            <div class="help">จำนวนรถมากขึ้น → ปล่อย PM2.5 มากขึ้น</div>
+          </div>
+
+          <div class="control">
+            <div class="controlTop"><label for="emission">Emission</label><span class="pill" id="emissionVal">2.6</span></div>
+            <input id="emission" type="range" min="0" max="10" step="0.1" value="2.6" />
+            <div class="help">PM2.5 ต่อ tick ต่อคัน</div>
+          </div>
+
+          <div class="control">
+            <div class="controlTop"><label for="diffusion">Diffusion</label><span class="pill" id="diffusionVal">0.22</span></div>
+            <input id="diffusion" type="range" min="0" max="1" step="0.01" value="0.22" />
+            <div class="help">กระจายมาก → แผ่กว้าง แต่ peak ลด</div>
+          </div>
+
+          <div class="control">
+            <div class="controlTop"><label for="decay">Decay</label><span class="pill" id="decayVal">0.006</span></div>
+            <input id="decay" type="range" min="0" max="0.05" step="0.001" value="0.006" />
+            <div class="help">สลายตัวต่อ tick (เหมือนการระบาย/ฝน)</div>
+          </div>
+
+          <div class="split">
+            <div class="control">
+              <div class="controlTop"><label for="windX">Wind X</label><span class="pill" id="windXVal">0.25</span></div>
+              <input id="windX" type="range" min="-1" max="1" step="0.05" value="0.25" />
+            </div>
+
+            <div class="control">
+              <div class="controlTop"><label for="windY">Wind Y</label><span class="pill" id="windYVal">-0.10</span></div>
+              <input id="windY" type="range" min="-1" max="1" step="0.05" value="-0.10" />
+            </div>
+          </div>
+
+          <div class="control">
+            <div class="controlTop"><label for="speed">Speed (tick/sec)</label><span class="pill" id="speedVal">18</span></div>
+            <input id="speed" type="range" min="1" max="60" value="18" />
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="chartCard">
+            <div class="chartHead">
+              <h3>PM2.5 Trend</h3>
+              <span class="badge subtle">Avg over time</span>
+            </div>
+            <canvas id="pmChart" width="420" height="220"></canvas>
+          </div>
+
+          <details class="details">
+            <summary>คอนเซ็ป</summary>
+            <ul>
+              <li>รถวิ่งบนถนนและปล่อยมลพิษ</li>
+              <li>มลพิษสะสม/กระจาย/ถูกลมพัด/สลายตัว</li>
+              <li>ดูผลเป็น heatmap บนกริดมุมสูง</li>
+            </ul>
+          </details>
+        </div>
+      </aside>
+
+    </section>
+
+    <footer class="footer">
+      <span>Top-Down Grid • Canvas + Chart.js</span>
+      <span class="muted">Tip: Live Server จะลื่นสุด</span>
+    </footer>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>
